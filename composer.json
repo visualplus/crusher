@@ -7,5 +7,10 @@
             "email": "visualplus@naver.com"
         }
     ],
-    "require": {}
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "Visualplus\\Crusher\\": "src/"
+        }
+    }
 }

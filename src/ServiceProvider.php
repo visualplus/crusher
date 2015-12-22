@@ -21,8 +21,5 @@ class ServiceProvider extends Illumiate\Support\ServiceProvider
      */
     public function register()
     {
-        $this->app->singleton('crusher', function($app) {
-            return new \Visualplus\Crusher\Crusher;
-        });
     }
 }
