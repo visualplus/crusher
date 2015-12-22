@@ -1,0 +1,11 @@
+{
+    "name": "visualplus/crusher",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "doojinso",
+            "email": "visualplus@naver.com"
+        }
+    ],
+    "require": {}
+}
