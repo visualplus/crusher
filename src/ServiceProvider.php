@@ -7,7 +7,13 @@ class ServiceProvider extends Illumiate\Support\ServiceProvider
      */
     public function boot()
     {
+        $this->publishes([
+            __DIR__ . '/../config/crusher.php' => config_path('crusher.php'),
+        ], 'config');
 
+        $this->publishes([
+            __DIR__ . '/../migrations/' => database_path('migrations'),
+        ], 'migrations');
     }
 
     /**
