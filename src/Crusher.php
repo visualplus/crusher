@@ -90,7 +90,11 @@ class Crusher extends Command
                 // 삭제할 데이터 모델들을 가져옴
                 foreach ($models as $model) {
                     $_model = new $model['model'];
-                    $targets = $_model->where($model['key'], '=', $list->member->idx)->get();
+                    $indexKey = 'idx';
+                    if (isset($model['key_column'])) {
+                        $indexKey = $model['key_column'];
+                    }
+                    $targets = $_model->where($model['key'], '=', $list->member->$indexKey)->get();
 
                     // 삭제 대상 데이터 모델들의 컬럼들을 모두 업데이트함
                     foreach ($targets as $target) {
