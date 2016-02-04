@@ -23,89 +23,92 @@ class Crusher extends Command
     protected $description = '개인정보 삭제 루틴';
 
     /**
+     * @param $member
+     * @param $rule
+     * @param $term
+     * @param $foreignKey
+     * @param $target
+     * @return integer
+     */
+    private function crush($member, $rule, $term, $foreignKey, $target, $groupKey)
+    {
+        $debug_mode     = config('crusher.debug');
+        $logging_mode   = config('crusher.log');
+
+        $log = [
+            'group_key'     => $groupKey,
+            'userno'        => $member->idx,
+            'rule'          => $rule,
+            'term'          => $term,
+            'table_name'    => $target->getTable(),
+            'before_data'   => serialize($target),
+        ];
+        $affected = $target->privacyMasking($rule, $term, $foreignKey);
+
+        if ($affected == count($target->getAttributes())) {
+            $log['after_data'] = 'DELETED';
+        } else {
+            $log['after_data'] = serialize($target);
+        }
+
+        if ($logging_mode) {
+            CrushScheduleLog::create($log);
+        }
+
+        if (!$debug_mode) {
+            if ($affected == count($target->getAttributes())) {
+                // 모든 컬럼이 업데이트됐으므로 해당 레코드를 삭제함.
+                $target->delete();
+            } else {
+                // 일부 컬럼이 업데이트됐으므로 저장함
+                $target->save();
+            }
+        }
+
+        return $affected;
+    }
+
+    /**
      * Execute the console command.
      *
      * @return mixed
      */
     public function handle()
     {
-        $debug_mode     = config('crusher.debug');
-        $logging_mode   = config('crusher.log');
-        $rules          = config('crusher.rules');
+        $terms          = config('crusher.terms');
+        $models         = config('crusher.models');
+        $groupKey       = Carbon::now()->format('Y-m-d H:i:s');
 
-        foreach ($rules as $rule => $ruleset) {
-            foreach ($ruleset as $term => $options) {
-                $lists = CrushSchedule::where('rule', '=', $rule)
-                    ->where('created_at', '>=', Carbon::now()->subMonths($term)->format('Y-m-d H:i:s'))
-                    ->where('progressed_that', '<', $term)
-                    ->get();
+        // 즉시, 3개월, 5년 순차적으로 적용
+        foreach ($terms as $term) {
+            $lists = CrushSchedule::where('progressed_that', '<', $term)
+                ->where('created_at', '<', Carbon::now()->subMonths($term)->format('Y-m-d 23:59:59'))
+                ->with('member')->get();
 
-                foreach ($lists as $list) {
-                    $MODEL = new $options['model'];
-                    $foreign_key = $options['key'];
-                    $action = $options['action'];
-                    $relation = $options['relation'];
+            // 삭제 대상을 가져옴
+            foreach ($lists as $list) {
+                $list->progressed_that = $term;
+                $list->save();
 
-                    // 룰셋에 맞는 정보들을 가져옴
-                    $records = $MODEL::where($foreign_key, '=', $list->userno)->get();
+                // 삭제할 데이터 모델들을 가져옴
+                foreach ($models as $model) {
+                    $_model = new $model['model'];
+                    $targets = $_model->where($model['key'], '=', $list->member->idx)->get();
 
-                    foreach ($records as $record) {
-                        $log = new CrushScheduleLog();
-                        $log->userno        = $list->userno;
-                        $log->rule          = serialize($options);
-                        $log->term          = $term;
-                        $log->table_name    = $record->getTable();
-                        $log->before_data   = serialize($record);
+                    // 삭제 대상 데이터 모델들의 컬럼들을 모두 업데이트함
+                    foreach ($targets as $target) {
+                        $this->crush($list->member, $list->rule, $term, $model['key'], $target, $groupKey);
 
-                        // 레코드 즉시 삭제
-                        if ($action['type'] == 'D') {
-                            if ($relation) {
-                                $RELATE_MODEL = $relation['model'];
-                                $relate_records = $RELATE_MODEL::where($relation['foreign_key'], '=', $record->$relation['local_key'])->get();
+                        // 연관 데이터도 삭제
+                        if (isset($model['related'])) {
+                            foreach ($model['related'] as $related) {
+                                $_relatedModel = new $related['model'];
+                                $relatedTargets = $_relatedModel->where($related['key'], '=', $related['parent'])->get();
 
-                                foreach ($relate_records as $relate_record) {
-                                    // 로깅모드이면 로그를 남김
-                                    if ($logging_mode) {
-                                        $relate_log = new CrushScheduleLog();
-                                        $relate_log->userno = $list->userno;
-                                        $relate_log->rule = serialize($options);
-                                        $relate_log->term = $term;
-                                        $relate_log->table_name = $relate_record->getTable();
-                                        $relate_log->before_data = serialize($relate_record);
-                                        $relate_log->after_data = 'DELETE_RELATE';
-                                        $relate_log->save();
-                                    }
-
-                                    // 디버그 모드가 아닐때만 실제로 삭제함
-                                    if (!$debug_mode) {
-                                        $relate_record->delete();
-                                    }
+                                foreach ($relatedTargets as $relatedTarget) {
+                                    $this->crush($list->member, $list->rule, $term, $model['related']['key'], $relatedTarget);
                                 }
                             }
-
-                            // 디버그 모드가 아닐때만 실제로 삭제함
-                            if (!$debug_mode) {
-                                $record->delete();
-                            }
-
-                            $log->after_data = 'DELETED';
-                        } // 컬럼값 업데이트
-                        else if ($action['type'] == 'U') {
-                            foreach ($action['columns'] as $column => $init_value) {
-                                $record->$column = $init_value;
-                            }
-
-                            // 디버그 모드가 아닐때만 실제로 컬럼값을 업데이트함
-                            if (!$debug_mode) {
-                                $record->save();
-                            }
-
-                            $log->after_data = serialize($record);
-                        }
-
-                        // 디버그모드이면 로그 데이터를 저장.
-                        if ($logging_mode) {
-                            $log->save();
                         }
                     }
                 }
