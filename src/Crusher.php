@@ -87,9 +87,6 @@ class Crusher extends Command
 
             // 삭제 대상을 가져옴
             foreach ($lists as $list) {
-                $list->progressed_that = $term;
-                $list->save();
-
                 // 삭제할 데이터 모델들을 가져옴
                 foreach ($models as $model) {
                     $_model = new $model['model'];
@@ -112,6 +109,9 @@ class Crusher extends Command
                         }
                     }
                 }
+
+                $list->progressed_that = $term;
+                $list->save();
             }
         }
     }
