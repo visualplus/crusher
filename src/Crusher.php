@@ -51,7 +51,7 @@ class Crusher extends Command
             $log['after_data'] = serialize($target);
         }
 
-        if ($logging_mode) {
+        if ($logging_mode && $affected > 0) {
             CrushScheduleLog::create($log);
         }
 
