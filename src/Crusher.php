@@ -43,7 +43,7 @@ class Crusher extends Command
             'table_name'    => $target->getTable(),
             'before_data'   => serialize($target),
         ];
-        $affected = $target->privacyMasking($rule, $term, $foreignKey);
+        $affected = $target->privacyMasking($rule, $term, $foreignKey, $member);
 
         if ($affected == count($target->getAttributes())) {
             $log['after_data'] = 'DELETED';
