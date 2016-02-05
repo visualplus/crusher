@@ -104,10 +104,10 @@ class Crusher extends Command
                         if (isset($model['related'])) {
                             foreach ($model['related'] as $related) {
                                 $_relatedModel = new $related['model'];
-                                $relatedTargets = $_relatedModel->where($related['key'], '=', $related['parent'])->get();
+                                $relatedTargets = $_relatedModel->where($related['key'], '=', $target->$related['parent'])->get();
 
                                 foreach ($relatedTargets as $relatedTarget) {
-                                    $this->crush($list->member, $list->rule, $term, $model['related']['key'], $relatedTarget);
+                                    $this->crush($list->member, $list->rule, $term, $related['key'], $relatedTarget, $groupKey);
                                 }
                             }
                         }
