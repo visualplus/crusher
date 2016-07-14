@@ -116,6 +116,10 @@ class Crusher extends Command
 
                 $list->progressed_that = $term;
                 $list->save();
+
+                if ($term == 60) {
+                    $list->delete();
+                }
             }
         }
     }
